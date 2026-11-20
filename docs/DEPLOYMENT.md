@@ -4,6 +4,12 @@
 
 This CRM is a separate Worker app. It does not alter `meteorsenergy.com`, its DNS, Pages project, website files or existing enquiry form. Integrate the website only after the CRM is deployed and tested, by posting enquiries to the API from a server-side Worker route or a protected form endpoint. Do not expose service credentials in browser JavaScript.
 
+## Live preview
+
+An initial R2-free Worker is deployed at https://meteors-energy-crm.ytst0931.workers.dev. It is bound to the existing D1 database and KV namespace. The first administrator can be created using the "Create first admin" option on the login page. Use a unique password of at least 12 characters. The bootstrap endpoint permanently closes once the first user exists.
+
+The custom hostname `crm.meteorsenergy.com` is not attached while the Cloudflare zone is pending. Activate the zone's assigned nameservers at the registrar only after confirming all existing DNS records, especially mail MX/SPF/DKIM records, have been copied correctly. The apex website DNS has not been modified by this CRM deployment.
+
 ## 1. Provision resources
 
 From this repository:
