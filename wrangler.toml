@@ -11,7 +11,7 @@ not_found_handling = "single-page-application"
 [[d1_databases]]
 binding = "DB"
 database_name = "meteors-crm-db"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "82139380-9692-458d-a12a-6856694b246b"
 migrations_dir = "migrations"
 
 [[r2_buckets]]
