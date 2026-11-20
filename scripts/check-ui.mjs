@@ -2,9 +2,11 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 const html = readFileSync('public/index.html', 'utf8');
-const match = html.match(/<script>([\\s\\S]*?)<\\/script>/i);
-if (!match) throw new Error('No inline application script found');
-new vm.Script(match[1], { filename: 'public/index.html' });
+const scriptStart = html.indexOf('<script>');
+const scriptEnd = html.indexOf('</script>', scriptStart);
+if (scriptStart < 0 || scriptEnd < 0) throw new Error('No inline application script found');
+const inlineScript = html.slice(scriptStart + '<script>'.length, scriptEnd);
+new vm.Script(inlineScript, { filename: 'public/index.html' });
 
 const worker = readFileSync('src/index.ts', 'utf8');
 for (const required of [
