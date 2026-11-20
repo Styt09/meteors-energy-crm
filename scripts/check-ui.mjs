@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 const html=readFileSync('public/index.html','utf8');
-const match=html.match(/<script>([\\s\\S]*?)<\\/script>/i);
+const match=html.match(/<script>([\\s\\S]*?)<\/script>/i);
 if(!match) throw new Error('No inline application script found');
 new vm.Script(match[1],{filename:'public/index.html'});
 const worker=readFileSync('worker.js','utf8');
