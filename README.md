@@ -37,6 +37,10 @@ See [DEPLOYMENT.md](./docs/DEPLOYMENT.md). Never commit API tokens, database sec
 - Private file metadata is stored in D1; objects belong in a private R2 bucket.
 - Configure rate limiting, backups, alerting and production secret rotation before launch.
 
+## Live preview
+
+The initial R2-free Worker is deployed at https://meteors-energy-crm.ytst0931.workers.dev. The custom hostname `crm.meteorsenergy.com` is not attached yet because the Cloudflare zone is still pending nameserver activation. The existing `meteorsenergy.com` website and its DNS records have not been changed.
+
 ## Current scope
 
 Initial implementation includes working CRUD APIs and UI for leads, customers, quotations, projects, follow-ups, payments, team, inventory, customer portal and dashboard aggregates. Third-party WhatsApp/email delivery, PDF generation, identity verification and production SSO require provider credentials/configuration and are documented separately.
