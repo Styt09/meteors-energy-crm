@@ -8,7 +8,7 @@ type Env = { DB:D1Database; DOC_INDEX:KVNamespace; ASSETS:Fetcher; APP_NAME:stri
 type Vars = { user:{id:string;name:string;email:string;role:Role;customer_id?:string|null} };
 const app = new Hono<{Bindings:Env;Variables:Vars}>();
 const id=()=>crypto.randomUUID();
-const jsonError=(c:Context,msg:string,status:400|401|403|404|500|503=400)=>c.json({error:msg},status);
+const jsonError=(c:Context,msg:string,status:400|401|403|404|500|502|503=400)=>c.json({error:msg},status);
 const enc=(s:string)=>new TextEncoder().encode(s);
 async function hashPassword(password:string,salt:string){
  const key=await crypto.subtle.importKey('raw',enc(password),'PBKDF2',false,['deriveBits']);
@@ -16,7 +16,7 @@ async function hashPassword(password:string,salt:string){
  return [...new Uint8Array(bits)].map(x=>x.toString(16).padStart(2,'0')).join('');
 }
 async function hashToken(token:string,secret:string){
- const key=await crypto.subtle.importKey('raw',enc(secret),'HMAC',{name:'HMAC',hash:'SHA-256'},false,['sign']);
+ const key=await crypto.subtle.importKey('raw',enc(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);
  const signature=await crypto.subtle.sign('HMAC',key,enc(token));
  return [...new Uint8Array(signature)].map(x=>x.toString(16).padStart(2,'0')).join('');
 }
@@ -28,7 +28,7 @@ function safeEqual(a:string,b:string){
 function validEmail(email:string){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)&&email.length<=254;}
 function normalizedEmail(value:unknown){return String(value||'').trim().toLowerCase();}
 app.use('/api/*',cors({origin:(origin,c)=>{
- const allowed=(c.env.ALLOWED_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean);
+ const allowed=(c.env.ALLOWED_ORIGINS||'').split(',').map((x:string)=>x.trim()).filter(Boolean);
  // Same-origin calls do not need CORS headers. Cross-origin calls require an exact allowlist match.
  return origin&&allowed.includes(origin)?origin:'';
 },credentials:true,allowMethods:['GET','POST','PUT','PATCH','DELETE','OPTIONS'],allowHeaders:['Content-Type']}));
