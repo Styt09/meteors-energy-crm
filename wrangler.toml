@@ -14,9 +14,9 @@ database_name = "meteors-crm-db"
 database_id = "82139380-9692-458d-a12a-6856694b246b"
 migrations_dir = "migrations"
 
-[[r2_buckets]]
-binding = "FILES"
-bucket_name = "meteors-crm-private-files"
+[[kv_namespaces]]
+binding = "DOC_INDEX"
+id = "67ee1ba36ff0483ebc8b15af117b7835"
 
 [vars]
 APP_NAME = "METEORS ENERGY CRM"
