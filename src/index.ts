@@ -84,7 +84,7 @@ app.post('/api/auth/login',async c=>{
  if(!safeEqual(supplied,u.password_hash))return jsonError(c,'Invalid email or password',401);
  const token=id()+id(),expires=new Date(Date.now()+8*60*60*1000).toISOString(),tokenHash=await hashToken(token,secret);
  await c.env.DB.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').bind(tokenHash,u.id,expires).run();
- setCookie(c,'me_session',token,{httpOnly:true,secure:true,sameSite:'Lax',path:'/',maxAge:28800});
+ setCookie(c,'me_session',token,{httpOnly:true,secure:new URL(c.req.url).protocol==='https:',sameSite:'Lax',path:'/',maxAge:28800});
  return c.json({user:{id:u.id,name:u.name,email:u.email,role:u.role}});
 });
 app.post('/api/auth/logout',async c=>{
@@ -118,7 +118,47 @@ app.get('/api/team',async c=>{if(!permitted(c,'team'))return jsonError(c,'Forbid
 app.post('/api/team',async c=>{if((c.get('user') as any).role!=='admin')return jsonError(c,'Admin only',403);const b=await c.req.json<any>();if(!b.name||!b.email||!b.password||b.password.length<12||!['manager','salesperson','accountant','installer'].includes(b.role))return jsonError(c,'Valid name, email, role and 12+ char password required');const email=normalizedEmail(b.email);if(!validEmail(email)||String(b.name).trim().length<2||String(b.password).length<12||String(b.password).length>256)return jsonError(c,'Valid name, email and 12–256 character password required');const salt=id(),uid=id();await c.env.DB.prepare('INSERT INTO users(id,name,email,phone,role,password_hash,password_salt) VALUES(?,?,?,?,?,?,?)').bind(uid,String(b.name).trim(),email,b.phone||null,b.role,await hashPassword(b.password,salt),salt).run();return c.json({id:uid},201);});
 app.get('/api/customer-portal',async c=>{const u=c.get('user');if(u.role!=='customer'||!u.customer_id)return jsonError(c,'Customer account required',403);const cid=u.customer_id;const [customer,projects,quotes,payments,docs]=await Promise.all([c.env.DB.prepare('SELECT id,name,company,phone,email,address FROM customers WHERE id=?').bind(cid).first(),c.env.DB.prepare('SELECT * FROM projects WHERE customer_id=?').bind(cid).all(),c.env.DB.prepare('SELECT * FROM quotations WHERE customer_id=?').bind(cid).all(),c.env.DB.prepare('SELECT * FROM payments WHERE customer_id=?').bind(cid).all(),c.env.DB.prepare('SELECT id,file_name,content_type,created_at FROM documents WHERE customer_id=?').bind(cid).all()]);return c.json({customer,projects:projects.results,quotations:quotes.results,payments:payments.results,documents:docs.results});});
 app.post('/api/customer-portal/support',async c=>{const u=c.get('user');if(u.role!=='customer'||!u.customer_id)return jsonError(c,'Customer account required',403);const b=await c.req.json<any>();if(!b.subject||!b.message)return jsonError(c,'Subject and message required');const rid=id();await c.env.DB.prepare('INSERT INTO support_requests(id,customer_id,subject,message) VALUES(?,?,?,?)').bind(rid,u.customer_id,b.subject,b.message).run();return c.json({id:rid},201);});
-app.get('/api/files/:id',async c=>{const u=c.get('user');const d=await c.env.DB.prepare('SELECT * FROM documents WHERE id=?').bind(c.req.param('id')).first<any>();if(!d)return jsonError(c,'Not found',404);if(u.role==='customer'&&d.customer_id!==u.customer_id)return jsonError(c,'Forbidden',403);if(!['admin','manager','accountant','installer','customer'].includes(u.role))return jsonError(c,'Forbidden',403);const meta=await c.env.DOC_INDEX.get('doc:'+d.id,'json') as any;if(!meta?.storage_url)return jsonError(c,'Document storage is not configured for this record',503);if(!c.env.HOSTINGER_UPLOAD_URL||!c.env.HOSTINGER_TOKEN)return jsonError(c,'External document storage is not configured',503);const upstream=await fetch(meta.storage_url,{headers:{Authorization:'Bearer '+c.env.HOSTINGER_TOKEN}});if(!upstream.ok)return jsonError(c,'Document unavailable',502);return new Response(upstream.body,{headers:{'Content-Type':d.content_type||'application/octet-stream','Content-Disposition':'attachment; filename="'+String(d.file_name).replace(/[\\r\\n"]/g,'')+'"','Cache-Control':'private, no-store'}});});
+app.get('/api/documents',async c=>{
+ const u=c.get('user');
+ if(!['admin','manager','accountant','installer','customer'].includes(u.role))return jsonError(c,'Forbidden',403);
+ let sql='SELECT id,customer_id,project_id,file_name,content_type,uploaded_by,created_at FROM documents';
+ const binds:any[]=[];
+ if(u.role==='customer'){sql+=' WHERE customer_id=?';binds.push(u.customer_id||'');}
+ sql+=' ORDER BY created_at DESC LIMIT 100';
+ const result=await c.env.DB.prepare(sql).bind(...binds).all();
+ return c.json({items:result.results||[]});
+});
+app.post('/api/documents',async c=>{
+ const u=c.get('user');
+ if(!['admin','manager','accountant','installer'].includes(u.role))return jsonError(c,'Forbidden',403);
+ let form:FormData;try{form=await c.req.formData();}catch{return jsonError(c,'Upload form is invalid');}
+ const file=form.get('file');
+ if(!(file instanceof File))return jsonError(c,'Choose a file to upload');
+ if(file.size<1||file.size>10*1024*1024)return jsonError(c,'File size must be between 1 byte and 10 MB');
+ const allowed=new Set(['application/pdf','image/jpeg','image/png','image/webp','text/plain','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/vnd.openxmlformats-officedocument.wordprocessingml.document']);
+ if(!allowed.has(file.type))return jsonError(c,'Allowed files: PDF, JPG, PNG, WEBP, TXT, XLSX, DOCX');
+ const customerId=String(form.get('customer_id')||'').trim()||null;
+ const projectId=String(form.get('project_id')||'').trim()||null;
+ if(customerId&&!await c.env.DB.prepare('SELECT id FROM customers WHERE id=?').bind(customerId).first())return jsonError(c,'Customer not found');
+ if(projectId&&!await c.env.DB.prepare('SELECT id FROM projects WHERE id=?').bind(projectId).first())return jsonError(c,'Project not found');
+ const docId=id(),key='file:'+docId;
+ try{
+  await c.env.DOC_INDEX.put(key,await file.arrayBuffer(),{metadata:{fileName:file.name,contentType:file.type}});
+  await c.env.DB.prepare('INSERT INTO documents(id,customer_id,project_id,file_key,file_name,content_type,uploaded_by) VALUES(?,?,?,?,?,?,?)')
+   .bind(docId,customerId,projectId,key,file.name.slice(0,255),file.type,u.id).run();
+ }catch(error){await c.env.DOC_INDEX.delete(key);throw error;}
+ return c.json({id:docId,file_name:file.name},201);
+});
+app.get('/api/files/:id',async c=>{
+ const u=c.get('user');
+ const d=await c.env.DB.prepare('SELECT * FROM documents WHERE id=?').bind(c.req.param('id')).first<any>();
+ if(!d)return jsonError(c,'Not found',404);
+ if(u.role==='customer'&&d.customer_id!==u.customer_id)return jsonError(c,'Forbidden',403);
+ if(!['admin','manager','accountant','installer','customer'].includes(u.role))return jsonError(c,'Forbidden',403);
+ const stored=await c.env.DOC_INDEX.get(d.file_key||'file:'+d.id,'arrayBuffer');
+ if(!stored)return jsonError(c,'Document file is missing from storage',404);
+ return new Response(stored,{headers:{'Content-Type':d.content_type||'application/octet-stream','Content-Disposition':'attachment; filename="'+String(d.file_name).replace(/[\\r\\n"]/g,'')+'"','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
+});
 app.onError((err,c)=>{console.error(JSON.stringify({message:'CRM request failed',path:c.req.path,error:err instanceof Error?err.message:'unknown'}));return c.json({error:'Internal server error'},500);});
 app.notFound(c=>c.req.path.startsWith('/api/')?c.json({error:'API route not found'},404):c.env.ASSETS.fetch(c.req.raw));
 export default app;
