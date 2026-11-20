@@ -68,7 +68,25 @@ async function render(){
  }
 }
 function openForm(type){
- if(!defs[type]){toast(type==='team'?'Team creation is available from the admin team API.':'This section is view-only for this role.');return;}
+ if(type==='team'){
+  if(user.role!=='admin'){toast('Only admin can add team members');return;}
+  document.getElementById('modalTitle').textContent='Add Team Member';
+  document.getElementById('fields').innerHTML=
+   '<div class="field"><label>Name</label><input name="name" required minlength="2"></div>'+
+   '<div class="field"><label>Email</label><input name="email" type="email" required></div>'+
+   '<div class="field"><label>Phone</label><input name="phone" type="tel"></div>'+
+   '<div class="field"><label>Role</label><select name="role"><option>manager</option><option>salesperson</option><option>accountant</option><option>installer</option></select></div>'+
+   '<div class="field"><label>Temporary password (12+ characters)</label><input name="password" type="password" minlength="12" maxlength="256" required></div>';
+  document.getElementById('modal').classList.add('open');
+  document.getElementById('recordForm').onsubmit=async event=>{
+   event.preventDefault();const button=event.submitter;button.disabled=true;
+   const body=Object.fromEntries(new FormData(event.target));
+   try{await api('/team',{method:'POST',body:JSON.stringify(body)});closeModal();toast('Team member created');render();}
+   catch(error){toast(error.message);button.disabled=false;}
+  };
+  return;
+ }
+ if(!defs[type]){toast('This section is not available in this version.');return;}
  document.getElementById('modalTitle').textContent='Add '+labels[type];
  document.getElementById('fields').innerHTML=defs[type].map(([name,label,inputType,extra])=>{
   const input=inputType==='select'
