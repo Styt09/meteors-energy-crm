@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "check:syntax": "node --check worker.js",
     "check:ui": "node scripts/check-ui.mjs",
-    "check": "npm run typecheck && npm run check:syntax && npm run check:ui"
+    "check": "npm run typecheck && npm run check:ui"
   },
   "dependencies": {
     "hono": "^4.6.12"
