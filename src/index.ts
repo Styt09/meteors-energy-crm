@@ -4,7 +4,7 @@ import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import type { Context } from 'hono';
 
 type Role = 'admin'|'manager'|'salesperson'|'accountant'|'installer'|'customer';
-type Env = { DB:D1Database; FILES:R2Bucket; ASSETS:Fetcher; APP_NAME:string; ENVIRONMENT:string; SESSION_SECRET:string };
+type Env = { DB:D1Database; FILES:R2Bucket; ASSETS:Fetcher; APP_NAME:string; ENVIRONMENT:string; SESSION_SECRET:string; ALLOWED_ORIGINS?:string };
 type Vars = { user:{id:string;name:string;email:string;role:Role;customer_id?:string|null} };
 const app = new Hono<{Bindings:Env;Variables:Vars}>();
 const id=()=>crypto.randomUUID();
@@ -12,7 +12,7 @@ const jsonError=(c:Context,msg:string,status:400|401|403|404|500=400)=>c.json({e
 const enc=(s:string)=>new TextEncoder().encode(s);
 async function hashPassword(password:string,salt:string){const key=await crypto.subtle.importKey('raw',enc(password),'PBKDF2',false,['deriveBits']);const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:enc(salt),iterations:210000,hash:'SHA-256'},key,256);return [...new Uint8Array(bits)].map(x=>x.toString(16).padStart(2,'0')).join('');}
 function safeEqual(a:string,b:string){if(a.length!==b.length)return false;let x=0;for(let i=0;i<a.length;i++)x|=a.charCodeAt(i)^b.charCodeAt(i);return x===0;}
-app.use('/api/*',cors({origin:(origin)=>origin||'',credentials:true,allowMethods:['GET','POST','PUT','PATCH','DELETE','OPTIONS'],allowHeaders:['Content-Type']}));
+app.use('/api/*',cors({origin:(origin,c)=>{const allowed=(c.env.ALLOWED_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean);return origin&&allowed.includes(origin)?origin:'';},credentials:true,allowMethods:['GET','POST','PUT','PATCH','DELETE','OPTIONS'],allowHeaders:['Content-Type']}));
 app.use('/api/*',async(c,next)=>{if(c.req.path==='/api/health'||c.req.path==='/api/auth/register'||c.req.path==='/api/auth/login')return next();const token=getCookie(c,'me_session');if(!token)return jsonError(c,'Authentication required',401);const session=await c.env.DB.prepare('SELECT s.user_id,u.name,u.email,u.role,u.customer_id,u.active FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?').bind(await hashPassword(token,c.env.SESSION_SECRET||'local-only-change-me'),new Date().toISOString()).first<any>();if(!session||!session.active)return jsonError(c,'Invalid or expired session',401);c.set('user',{id:session.user_id,name:session.name,email:session.email,role:session.role,customer_id:session.customer_id});await next();});
 app.get('/api/health',c=>c.json({ok:true,app:'METEORS ENERGY CRM'}));
 app.post('/api/auth/register',async c=>{const body=await c.req.json<any>();const count=await c.env.DB.prepare('SELECT COUNT(*) n FROM users').first<any>();if(count?.n>0)return jsonError(c,'Initial admin already exists',403);if(!body.name||!body.email||!body.password||body.password.length<12)return jsonError(c,'Name, email and password (12+ chars) required');const salt=id();const uid=id();await c.env.DB.prepare('INSERT INTO users(id,name,email,role,password_hash,password_salt) VALUES(?,?,?,\'admin\',?,?)').bind(uid,body.name,String(body.email).toLowerCase(),await hashPassword(body.password,salt),salt).run();return c.json({ok:true,user_id:uid},201);});
