@@ -1,0 +1,23 @@
+name = "meteors-energy-crm"
+main = "src/index.ts"
+compatibility_date = "2026-11-21"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "meteors-crm-db"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "meteors-crm-private-files"
+
+[vars]
+APP_NAME = "METEORS ENERGY CRM"
+ENVIRONMENT = "development"
