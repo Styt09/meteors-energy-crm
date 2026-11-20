@@ -10,7 +10,7 @@ This repository starts as an independent application. It does **not** modify the
 
 - Cloudflare Workers + Hono API
 - Cloudflare D1 (SQLite) with SQL migrations
-- Cloudflare R2 for private project/customer documents
+- Cloudflare KV for lightweight document metadata (binary file storage is not enabled yet)
 - Cloudflare Access / app-level session auth (production setup documented)
 - Vanilla TypeScript frontend built as a static SPA
 
@@ -39,7 +39,7 @@ See [DEPLOYMENT.md](./docs/DEPLOYMENT.md). Never commit API tokens, database sec
 
 ## Live preview
 
-The initial R2-free Worker is deployed at https://meteors-energy-crm.ytst0931.workers.dev. The custom hostname `crm.meteorsenergy.com` is not attached yet because the Cloudflare zone is still pending nameserver activation. The existing `meteorsenergy.com` website and its DNS records have not been changed.
+Deploy from `src/index.ts` and `public/` using Wrangler; do not use the legacy standalone `worker.js` bundle. The custom hostname `crm.meteorsenergy.com` is not attached yet because the Cloudflare zone is still pending nameserver activation. The existing `meteorsenergy.com` website and its DNS records have not been changed.
 
 ## Current scope
 
