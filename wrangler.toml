@@ -1,6 +1,6 @@
 name = "meteors-energy-crm"
 main = "src/index.ts"
-compatibility_date = "2026-11-21"
+compatibility_date = "2026-11-20"
 compatibility_flags = ["nodejs_compat"]
 
 [assets]
@@ -20,4 +20,4 @@ id = "67ee1ba36ff0483ebc8b15af117b7835"
 
 [vars]
 APP_NAME = "METEORS ENERGY CRM"
-ENVIRONMENT = "development"
+ENVIRONMENT = "production"
