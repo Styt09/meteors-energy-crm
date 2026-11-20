@@ -8,7 +8,7 @@ type Env = { DB:D1Database; DOC_INDEX:KVNamespace; ASSETS:Fetcher; APP_NAME:stri
 type Vars = { user:{id:string;name:string;email:string;role:Role;customer_id?:string|null} };
 const app = new Hono<{Bindings:Env;Variables:Vars}>();
 const id=()=>crypto.randomUUID();
-const jsonError=(c:Context,msg:string,status:400|401|403|404|500=400)=>c.json({error:msg},status);
+const jsonError=(c:Context,msg:string,status:400|401|403|404|500|503=400)=>c.json({error:msg},status);
 const enc=(s:string)=>new TextEncoder().encode(s);
 async function hashPassword(password:string,salt:string){
  const key=await crypto.subtle.importKey('raw',enc(password),'PBKDF2',false,['deriveBits']);
@@ -69,7 +69,7 @@ app.post('/api/auth/register',async c=>{
  ]);
  const inserted=Number(result[0]?.meta?.changes||0);
  if(!inserted)return jsonError(c,'Initial administrator already exists. Please sign in.',403);
- setCookie(c,'me_session',token,{httpOnly:true,secure:true,sameSite:'Lax',path:'/',maxAge:28800});
+ setCookie(c,'me_session',token,{httpOnly:true,secure:new URL(c.req.url).protocol==='https:',sameSite:'Lax',path:'/',maxAge:28800});
  return c.json({ok:true,user:{id:uid,name,email,role:'admin'}},201);
 });
 app.post('/api/auth/login',async c=>{
@@ -90,7 +90,7 @@ app.post('/api/auth/login',async c=>{
 app.post('/api/auth/logout',async c=>{
  const secret=c.env.SESSION_SECRET,token=getCookie(c,'me_session');
  if(token&&secret&&secret.length>=32)await c.env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await hashToken(token,secret)).run();
- deleteCookie(c,'me_session',{path:'/',secure:true,sameSite:'Lax'});
+ deleteCookie(c,'me_session',{path:'/',secure:new URL(c.req.url).protocol==='https:',sameSite:'Lax'});
  return c.json({ok:true});
 });
 app.get('/api/auth/me',c=>c.json({user:c.get('user')}));
